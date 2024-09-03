@@ -17,9 +17,11 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse, Response
 
 from xiaomusic import __version__
+from xiaomusic.models import PauseRequest, PlayRequest, actionRequest
 from xiaomusic.utils import (
     deepcopy_data_no_sensitive_info,
     downloadfile,
@@ -73,6 +75,22 @@ app = FastAPI(
     lifespan=app_lifespan,
     version=__version__,
     dependencies=[Depends(verification)],
+)
+
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://example.com",
+    "*"
+]
+
+# 添加中间件来启用CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # 允许的源
+    allow_credentials=True,  # 是否允许发送跨域凭证（cookies）
+    allow_methods=["*"],  # 允许的方法，比如GET、POST等等，"*"表示允许所有方法
+    allow_headers=["*"],  # 允许的请求头，"*"表示允许所有请求头
 )
 
 
