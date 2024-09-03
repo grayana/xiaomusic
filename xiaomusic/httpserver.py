@@ -302,6 +302,41 @@ async def playurl(did: str, url: str):
     log.info(f"playurl did: {did} url: {url}")
     return await xiaomusic.play_url(did=did, arg1=url)
 
+@app.post("/musics")
+async def musics(did: str = ""):
+    if not xiaomusic.did_exist(did):
+        return ""
+    list_name = xiaomusic.get_cur_play_list(did)
+    return xiaomusic.get_music_list().get(list_name)
+
+@app.post("/pause")
+async def pause(request: PauseRequest):
+    device_id = request.deviceId
+    ret = await xiaomusic.pause(device_id)
+
+    if ret:
+        return {"ret": "ok", "deviceId": device_id}
+    return {"ret": "failed", "deviceId": device_id}
+
+
+@app.post("/play")
+async def play(request: PlayRequest):
+    device_id = request.deviceId
+    ret = await xiaomusic.resume(device_id)
+    if ret:
+        return {"ret": "ok", "deviceId": device_id}
+    return {"ret": "failed", "deviceId": device_id}
+
+
+@app.post("/action")
+async def action(request: actionRequest):
+    try:
+        deviceId =  request.deviceId
+        action =  request.action
+        return await xiaomusic.action(deviceId, action)
+    except json.JSONDecodeError as err:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from err
+
 
 @app.post("/debug_play_by_music_url")
 async def debug_play_by_music_url(request: Request):
