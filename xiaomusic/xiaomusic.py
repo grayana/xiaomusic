@@ -1182,13 +1182,13 @@ class XiaoMusicDevice:
             audioid = await self._get_songId(name)
             if self.config.use_music_api:
                 ret = await self.xiaomusic.mina_service.play_by_music_url(
-                    device_id, url, audio_id=audioid
+                    device_id, url, _type=1, audio_id=audioid
                 )
                 self.log.info(
                     f"play_one_url play_by_music_url device_id:{device_id} ret:{ret} url:{url}"
                 )
             else:
-                ret = await self.xiaomusic.mina_service.play_by_url(device_id, url, audio_id=audioid)
+                ret = await self.xiaomusic.mina_service.play_by_url(device_id, url, _type=1, audio_id=audioid)
                 self.log.info(
                     f"play_one_url play_by_url device_id:{device_id} ret:{ret} url:{url}"
                 )
