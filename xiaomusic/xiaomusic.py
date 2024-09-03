@@ -942,10 +942,10 @@ class XiaoMusicDevice:
         self.log.info("开始播放下一首")
         name = self.cur_music
         if (
-            self.device.play_type == PLAY_TYPE_ALL
-            or self.device.play_type == PLAY_TYPE_RND
-            or name == ""
-            or (name not in self._play_list)
+                self.device.play_type == PLAY_TYPE_ALL
+                or self.device.play_type == PLAY_TYPE_RND
+                or name == ""
+                or (name not in self._play_list)
         ):
             name = self.get_next_music()
         self.log.info(f"_play_next. name:{name}, cur_music:{self.cur_music}")
@@ -1206,7 +1206,7 @@ class XiaoMusicDevice:
             "timestamp": int(time.time_ns() / 1000)
         }
         response = await self.xiaomusic.mina_service.mina_request('/music/search', params)
-        audio_id = response['data']['songList'][5]['audioID'] #QQ音乐为搜索结果的第6首歌
+        audio_id = response['data']['songList'][5]['audioID']  # QQ音乐为搜索结果的第6首歌
         self.log.info(f"get_songId. {name} songId:{audio_id}")
         return str(audio_id)
 
@@ -1228,31 +1228,31 @@ class XiaoMusicDevice:
         self._next_timer = asyncio.create_task(_do_next())
         self.log.info(f"{sec} 秒后将会播放下一首歌曲")
 
-        # 获取剩余时间
-        def get_remaining_time(self):
-            if self._next_timer and not self._next_timer.done():
-                elapsed_time = time.time() - self._start_time
-                remaining_time = self._timeout - elapsed_time
-                self.log.info(f"剩余时间 {remaining_time}")
-                return remaining_time
-            else:
-                return 0
+    # 获取剩余时间
+    def get_remaining_time(self):
+        if self._next_timer and not self._next_timer.done():
+            elapsed_time = time.time() - self._start_time
+            remaining_time = self._timeout - elapsed_time
+            self.log.info(f"剩余时间 {remaining_time}")
+            return remaining_time
+        else:
+            return 0
 
-        # 暂停定时器
-        async def pause_timer(self):
-            if self._next_timer and not self._next_timer.done():
-                self._paused_time = time.time()
-                elapsed_time = self._paused_time - self._start_time
-                self._remain_time = self._timeout - elapsed_time
-                self._next_timer.cancel()
-                self._next_timer = None
-                self.log.info(f"暂停定时器 剩余{self._remain_time}秒")
+    # 暂停定时器
+    async def pause_timer(self):
+        if self._next_timer and not self._next_timer.done():
+            self._paused_time = time.time()
+            elapsed_time = self._paused_time - self._start_time
+            self._remain_time = self._timeout - elapsed_time
+            self._next_timer.cancel()
+            self._next_timer = None
+            self.log.info(f"暂停定时器 剩余{self._remain_time}秒")
 
-        # 恢复定时器
-        async def resume_timer(self):
-            if self._paused_time:
-                await self.set_next_music_timeout(self._remain_time)
-                self.log.info(f"恢复定时器 剩余{self._timeout}秒")
+    # 恢复定时器
+    async def resume_timer(self):
+        if self._paused_time:
+            await self.set_next_music_timeout(self._remain_time)
+            self.log.info(f"恢复定时器 剩余{self._timeout}秒")
 
     async def set_volume(self, volume: int):
         self.log.info("set_volume. volume:%d", volume)
