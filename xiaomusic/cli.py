@@ -136,7 +136,7 @@ def main():
 
     try:
         filename = config.getsettingfile()
-        with open(filename,encoding="utf-8") as f:
+        with open(filename, encoding="utf-8") as f:
             data = json.loads(f.read())
             config.update_config(data)
     except Exception as e:
@@ -154,7 +154,6 @@ def main():
 
     def signal_handler(sig, frame):
         print("主进程收到退出信号，准备退出...")
-
         os._exit(0)  # 退出主进程
 
     # 捕获主进程的退出信号
