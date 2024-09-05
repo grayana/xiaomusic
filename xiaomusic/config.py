@@ -14,6 +14,7 @@ def default_key_word_dict():
     return {
         "播放歌曲": "play",
         "播放本地歌曲": "playlocal",
+        "暂停":"pause",
         "关机": "stop",
         "下一首": "play_next",
         "单曲循环": "set_play_type_one",
@@ -49,6 +50,7 @@ def default_key_match_order():
         "单曲循环",
         "全部循环",
         "随机播放",
+        "暂停",
         "关机",
         "刷新列表",
         "播放列表",
@@ -127,7 +129,7 @@ class Config:
         "XIAOMUSIC_KEYWORDS_PLAYLOCAL", "播放本地歌曲,本地播放歌曲"
     )
     keywords_play: str = os.getenv("XIAOMUSIC_KEYWORDS_PLAY", "播放歌曲,放歌曲")
-    keywords_stop: str = os.getenv("XIAOMUSIC_KEYWORDS_STOP", "关机,暂停,停止,停止播放")
+    keywords_stop: str = os.getenv("XIAOMUSIC_KEYWORDS_STOP", "关机,停止,停止播放")
     user_key_word_dict: dict[str, str] = field(
         default_factory=default_user_key_word_dict
     )

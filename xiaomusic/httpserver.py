@@ -163,11 +163,22 @@ def playingmusic(did: str = ""):
 
     is_playing = xiaomusic.isplaying(did)
     cur_music = xiaomusic.playingmusic(did)
+    duration = xiaomusic.get_duration(did)
+    offset = xiaomusic.get_offset(did)
     return {
         "ret": "OK",
         "is_playing": is_playing,
         "cur_music": cur_music,
+        "duration": duration,
+        "offset": offset,
     }
+
+@app.get("/paly/info")
+async def play_info(did: str = ""):
+    if not xiaomusic.did_exist(did):
+        return {"ret": "Did not exist"}
+    reslut =await xiaomusic.get_remote_play_info(did)
+    return reslut
 
 
 class DidCmd(BaseModel):
