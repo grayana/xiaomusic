@@ -802,6 +802,15 @@ class XiaoMusic:
     def isplaying(self, did):
         return self.devices[did].isplaying()
 
+    def get_duration(self, did):
+        return self.devices[did].get_duration()
+
+    def get_offset(self, did):
+        return self.devices[did].get_offset()
+
+    def get_remote_play_info(self, did):
+        return self.devices[did].get_play_info()
+
     # 获取当前配置
     def getconfig(self):
         return self.config
@@ -854,6 +863,11 @@ class XiaoMusic:
 
     # 重新初始化
     async def reinit(self, **kwargs):
+        self.log.info("reinit start")
+        # 关闭当前的日志处理器
+        for handler in self.log.handlers[:]:
+            handler.close()
+            self.log.removeHandler(handler)
         self.setup_logger()
         await self.init_all_data(self.session)
         self._gen_all_music_list()
@@ -896,6 +910,40 @@ class XiaoMusic:
     async def do_tts(self, did, value):
         return await self.devices[did].do_tts(value)
 
+    async def pause(self, did,**kwargs):
+        try:
+            device_id = self.devices[did].device_id
+            ret = await self.mina_service.player_pause(device_id)
+            # did = self.device_id_did.get(device_id, "")
+            await self.devices[did].pause_timer()
+            self.log.info(f"pause device_id:{device_id} ret:{ret}")
+            return True
+        except Exception as e:
+            self.log.exception(f"Execption {e}")
+            return False
+
+    async def resume(self, device_id):
+        try:
+            ret = await self.mina_service.player_play(device_id)
+            did = self.device_id_did.get(device_id, "")
+            await self.devices[did].resume_timer()
+            self.log.info(f"resume device_id:{device_id} ret:{ret}")
+            return True
+        except Exception as e:
+            self.log.exception(f"Execption {e}")
+            return False
+
+        # next
+
+    async def action(self, device_id, action: str):
+        try:
+            ret = await self.mina_service.player_action(device_id, action)
+            self.log.info(f"next device_id:{device_id} ret:{ret}")
+            return ret
+        except Exception as e:
+            self.log.exception(f"Execption {e}")
+            return {"ret": "failed", "msg": e}
+
 
 class XiaoMusicDevice:
     def __init__(self, xiaomusic: XiaoMusic, device: Device, group_name: str):
@@ -910,9 +958,18 @@ class XiaoMusicDevice:
 
         self._download_proc = None  # 下载对象
         self.cur_music = self.device.cur_music
+        self.cur_music_duration = None
         self._next_timer = None
         self._timeout = 0
         self._playing = False
+
+        # 记录开始暂停时间
+        self._start_time = None
+        self._paused_time = None
+        self._remain_time = None
+        self._total_played_time = None
+
+
         # 关机定时器
         self._stop_timer = None
         self._last_cmd = None
@@ -994,11 +1051,15 @@ class XiaoMusicDevice:
     async def _playmusic(self, name):
         # 取消组内所有的下一首歌曲的定时器
         self.cancel_group_next_timer()
+        self._total_played_time = 0
+
+        self._paused_time = None
 
         self._playing = True
         self.cur_music = name
         self.log.info(f"cur_music {self.cur_music}")
         sec, url = await self.xiaomusic.get_music_sec_url(name)
+        self.cur_music_duration = sec
         await self.group_force_stop_xiaoai()
         self.log.info(f"播放 {url}")
         results = await self.group_player_play(url)
@@ -1114,7 +1175,7 @@ class XiaoMusicDevice:
         if self.isplaying() and not self.isdownloading():
             # 继续播放歌曲
             self.log.info("现在继续播放歌曲")
-            await self._play()
+            # await self._play()
         else:
             self.log.info(
                 f"不会继续播放歌曲. isplaying:{self.isplaying()} isdownloading:{self.isdownloading()}"
@@ -1122,7 +1183,17 @@ class XiaoMusicDevice:
 
     # 当前是否正在播放歌曲
     def isplaying(self):
-        return self._playing
+        return self._playing and (self._paused_time is None)
+
+    def get_duration(self):
+        return self.cur_music_duration
+
+    def get_offset(self):
+        if self._start_time is None:
+            return self._total_played_time  # 如果_start_time为None，返回_total_played_time
+        if self._paused_time is None:
+            return self._total_played_time + time.time() - self._start_time  # 如果_paused_time为None，返回_total_played_time加上从_start_time到现在的时间
+        return self._total_played_time
 
     # 把下载的音乐加入播放列表
     def add_download_music(self, name):
@@ -1187,25 +1258,27 @@ class XiaoMusicDevice:
             self.log.exception(f"Execption {e}")
 
     # 同一组设备播放
-    async def group_player_play(self, url):
+    async def group_player_play(self, url, name=""):
         device_id_list = self.xiaomusic.get_group_device_id_list(self.group_name)
-        tasks = [self.play_one_url(device_id, url) for device_id in device_id_list]
+        name = self.cur_music
+        tasks = [self.play_one_url(device_id, url, name) for device_id in device_id_list]
         results = await asyncio.gather(*tasks)
         self.log.info(f"group_player_play {url} {device_id_list} {results}")
         return results
 
-    async def play_one_url(self, device_id, url):
+    async def play_one_url(self, device_id, url, name=""):
         ret = None
         try:
+            audioid = await self._get_songId(name)
             if self.config.use_music_api:
                 ret = await self.xiaomusic.mina_service.play_by_music_url(
-                    device_id, url
+                    device_id, url, _type=1, audio_id=audioid
                 )
                 self.log.info(
                     f"play_one_url play_by_music_url device_id:{device_id} ret:{ret} url:{url}"
                 )
             else:
-                ret = await self.xiaomusic.mina_service.play_by_url(device_id, url)
+                ret = await self.xiaomusic.mina_service.play_by_url(device_id, url, _type=1, audio_id=audioid)
                 self.log.info(
                     f"play_one_url play_by_url device_id:{device_id} ret:{ret} url:{url}"
                 )
@@ -1213,12 +1286,27 @@ class XiaoMusicDevice:
             self.log.exception(f"Execption {e}")
         return ret
 
+    # 根据歌曲名字获取歌曲ID
+    async def _get_songId(self, name):
+        params = {
+            "query": name,
+            "queryType": 1,
+            "offset": 0,
+            "count": 6,
+            "timestamp": int(time.time_ns() / 1000)
+        }
+        response = await self.xiaomusic.mina_service.mina_request('/music/search', params)
+        audio_id = response['data']['songList'][5]['audioID']  # QQ音乐为搜索结果的第6首歌
+        self.log.info(f"get_songId. {name} songId:{audio_id}")
+        return str(audio_id)
+
     # 设置下一首歌曲的播放定时器
     async def set_next_music_timeout(self, sec):
         self.cancel_next_timer()
         self._timeout = sec
 
         async def _do_next():
+            self._start_time = time.time()
             await asyncio.sleep(self._timeout)
             try:
                 self.log.info("定时器时间到了")
@@ -1229,6 +1317,26 @@ class XiaoMusicDevice:
 
         self._next_timer = asyncio.create_task(_do_next())
         self.log.info(f"{sec} 秒后将会播放下一首歌曲")
+
+
+    # 暂停定时器
+    async def pause_timer(self):
+        if self._next_timer and not self._next_timer.done():
+            self._paused_time = time.time()
+            elapsed_time = self._paused_time - self._start_time
+            self._total_played_time += elapsed_time  # 在暂停时更新_total_played_time
+            self._remain_time = self._timeout - elapsed_time
+            self._next_timer.cancel()
+            self._next_timer = None
+            self.log.info(f"暂停定时器 剩余{self._remain_time}秒")
+
+    # 恢复定时器
+    async def resume_timer(self):
+        if self._paused_time:
+            self._start_time = time.time()
+            self._paused_time = None
+            await self.set_next_music_timeout(self._remain_time)
+            self.log.info(f"恢复定时器 剩余{self._timeout}秒")
 
     async def set_volume(self, volume: int):
         self.log.info("set_volume. volume:%d", volume)
@@ -1248,6 +1356,13 @@ class XiaoMusicDevice:
         volume = int(volume)
         self.log.info("get_volume. volume:%d", volume)
         return volume
+
+    async def get_play_info(self):
+        playing_info = await self.xiaomusic.mina_service.player_get_status(
+            self.device_id
+        )
+        self.log.debug(f"get_play_info. playing_info:{playing_info}")
+        return playing_info
 
     async def set_play_type(self, play_type):
         self.device.play_type = play_type
