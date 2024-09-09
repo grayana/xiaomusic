@@ -74,7 +74,6 @@ def no_verification():
 app = FastAPI(
     lifespan=app_lifespan,
     version=__version__,
-    dependencies=[Depends(verification)],
 )
 
 origins = [
@@ -114,19 +113,19 @@ def HttpInit(_xiaomusic):
 
 
 @app.get("/")
-async def read_index():
+async def read_index(Verifcation=Depends(verification)):
     folder = os.path.dirname(__file__)
     return FileResponse(f"{folder}/static/index.html")
 
 
 @app.get("/getversion")
-def getversion():
+def getversion(Verifcation=Depends(verification)):
     log.debug("getversion %s", __version__)
     return {"version": __version__}
 
 
 @app.get("/getvolume")
-async def getvolume(did: str = ""):
+async def getvolume(did: str = "", Verifcation=Depends(verification)):
     if not xiaomusic.did_exist(did):
         return {"volume": 0}
 
@@ -140,7 +139,7 @@ class DidVolume(BaseModel):
 
 
 @app.post("/setvolume")
-async def setvolume(data: DidVolume):
+async def setvolume(data: DidVolume, Verifcation=Depends(verification)):
     did = data.did
     volume = data.volume
     if not xiaomusic.did_exist(did):
@@ -152,12 +151,12 @@ async def setvolume(data: DidVolume):
 
 
 @app.get("/searchmusic")
-def searchmusic(name: str = ""):
+def searchmusic(name: str = "", Verifcation=Depends(verification)):
     return xiaomusic.searchmusic(name)
 
 
 @app.get("/playingmusic")
-def playingmusic(did: str = ""):
+def playingmusic(did: str = "", Verifcation=Depends(verification)):
     if not xiaomusic.did_exist(did):
         return {"ret": "Did not exist"}
 
@@ -187,7 +186,7 @@ class DidCmd(BaseModel):
 
 
 @app.post("/cmd")
-async def do_cmd(data: DidCmd):
+async def do_cmd(data: DidCmd, Verifcation=Depends(verification)):
     did = data.did
     cmd = data.cmd
     log.info(f"docmd. did:{did} cmd:{cmd}")
@@ -206,7 +205,7 @@ async def do_cmd(data: DidCmd):
 
 
 @app.get("/getsetting")
-async def getsetting(need_device_list: bool = False):
+async def getsetting(need_device_list: bool = False, Verifcation=Depends(verification)):
     config = xiaomusic.getconfig()
     data = asdict(config)
     if need_device_list:
@@ -217,7 +216,7 @@ async def getsetting(need_device_list: bool = False):
 
 
 @app.post("/savesetting")
-async def savesetting(request: Request):
+async def savesetting(request: Request, Verifcation=Depends(verification)):
     try:
         data_json = await request.body()
         data = json.loads(data_json.decode("utf-8"))
@@ -235,8 +234,18 @@ async def musiclist(Verifcation=Depends(verification)):
     return xiaomusic.get_music_list()
 
 
+@app.get("/musicinfo")
+async def musicinfo(name: str, Verifcation=Depends(verification)):
+    url = xiaomusic.get_music_url(name)
+    return {
+        "ret": "OK",
+        "name": name,
+        "url": url,
+    }
+
+
 @app.get("/curplaylist")
-async def curplaylist(did: str = ""):
+async def curplaylist(did: str = "", Verifcation=Depends(verification)):
     if not xiaomusic.did_exist(did):
         return ""
     return xiaomusic.get_cur_play_list(did)
@@ -247,7 +256,7 @@ class MusicItem(BaseModel):
 
 
 @app.post("/delmusic")
-def delmusic(data: MusicItem):
+def delmusic(data: MusicItem, Verifcation=Depends(verification)):
     log.info(data)
     xiaomusic.del_music(data.name)
     return "success"
@@ -258,7 +267,7 @@ class UrlInfo(BaseModel):
 
 
 @app.post("/downloadjson")
-async def downloadjson(data: UrlInfo):
+async def downloadjson(data: UrlInfo, Verifcation=Depends(verification)):
     log.info(data)
     url = data.url
     content = ""
@@ -306,7 +315,7 @@ def downloadlog(Verifcation=Depends(verification)):
 
 
 @app.get("/playurl")
-async def playurl(did: str, url: str):
+async def playurl(did: str, url: str, Verifcation=Depends(verification)):
     if not xiaomusic.did_exist(did):
         return {"ret": "Did not exist"}
 
@@ -350,7 +359,7 @@ async def action(request: actionRequest):
 
 
 @app.post("/debug_play_by_music_url")
-async def debug_play_by_music_url(request: Request):
+async def debug_play_by_music_url(request: Request, Verifcation=Depends(verification)):
     try:
         data = await request.body()
         data_dict = json.loads(data.decode("utf-8"))
